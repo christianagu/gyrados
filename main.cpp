@@ -39,6 +39,20 @@ int initialize_server_socket(struct sockaddr_in server_addr, socklen_t server_bi
     return sockFD;
 }
 
+void receiveMessages(int clientSocket) {
+    while (true) {
+        char buffer[1024];
+        int bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
+        if (bytesRead <= 0){
+            // Handle disconnection or error
+            cout << "Disconnected from server or error occured";
+            break;
+        }
+        buffer[bytesRead] = '\0'; // Null-terminate the string
+        cout << "received: " << buffer << endl;
+    }
+}
+
 // Add a new client to the socket list
 void addClient(int clientSocket){
 
@@ -92,13 +106,21 @@ int main() {
     socklen_t client_addr_len = sizeof(client_addr);
     int backlog = 5;
 
+
+    // Zero out the structure
+    memset(&server_addr, 0, sizeof(server_addr));
+
+    // Set the address family, IP address, and port
+    server_addr.sin_family = AF_INET; // IPv4
+    server_addr.sin_port = htons(8080); // selecting port
+    server_addr.sin_addr.s_addr = INADDR_ANY; // Bind to local address
+
     int listeningSocket = initialize_server_socket(server_addr, client_addr_len);
 
 
     while(true) {
-
-        struct sockaddr_in client_addr;
-        socklen_t client_addr_len = sizeof(client_addr);
+        string message;
+        getline(cin, message);
 
         int clientSocket = accept(listeningSocket, (struct sockaddr*)&client_addr, &client_addr_len);
 
@@ -106,6 +128,13 @@ int main() {
             perror("error accepting client");
             continue;
         }
+        if (send(clientSocket, message.c_str(), message.length(), 0) == -1) {
+            perror("Failed to send message");
+            break;
+        }
+        struct sockaddr_in client_addr;
+        socklen_t client_addr_len = sizeof(client_addr);
+
         thread(clientHandler, clientSocket).detach();
     }
     close(listeningSocket);
@@ -142,5 +171,3 @@ int main() {
     list<int> clients; // storing client IDs
     mutex clientMutex;
     */
-}
-    
