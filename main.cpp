@@ -10,6 +10,12 @@
 using namespace std;
 
 
+// Shared data structures
+list<int> clientSockets; // storing client IDs
+
+// Synchronization of primitives
+mutex clientListMutex;
+
 int server_Listener(struct sockaddr_in server_sockFD, socklen_t server_bind){
     int backlog = 0;
 
@@ -25,9 +31,51 @@ int server_Listener(struct sockaddr_in server_sockFD, socklen_t server_bind){
     return result_Listen;
 }
 
+// Add a new client to the socket list
+void addClient(int clientSocket){
 
+    // Automatically locks our mutex
+    lock_guard<mutex> lock(clientListMutex);
+    
+    // Mutex will be automatically locked when lock goes out of scope
+    clientSockets.push_back(clientSocket);
+}
 
+// Add a new client to the socket list
+void removeClient(int clientSocket){
 
+    // Automatically locks our mutex
+    lock_guard<mutex> lock(clientListMutex);
+    
+    // Mutex will be automatically locked when lock goes out of scope
+    clientSockets.remove(clientSocket);
+}
+
+void broadcastMessage(const char* message){
+
+    lock_guard<mutex> lock(clientListMutex);
+    for (int socket : clientSockets){
+        send(socket, message, strlen(message), 0);
+    }
+}
+
+void clientHandler(int clientSocket){
+    addClient(clientSocket);
+
+    while(true) {
+
+        char buffer[1024];
+        int bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
+
+        if (bytesRead <= 0){
+            // client disconnected or error
+            break;
+        }
+        broadcastMessage(buffer);
+    }
+    removeClient(clientSocket);
+    close(clientSocket);
+}
 
 
 int main() {
@@ -35,9 +83,9 @@ int main() {
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
     int backlog = 5;
+
     server_Listener(server_addr, client_addr_len);
-
-
+    
 }
     
     /*
