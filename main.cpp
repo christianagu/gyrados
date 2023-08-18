@@ -7,6 +7,7 @@
 #include <list>
 #include <mutex>
 #include <thread>
+#include "src/server/database.cpp"
 
 using namespace std;
 
@@ -17,6 +18,22 @@ list<int> clientSockets; // storing client IDs
 // Synchronization of primitives
 mutex clientListMutex;
 
+bool handleLogin(int clientSocket){
+    char buffer[1024];
+    int bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
+    if (bytesRead <= 0) {
+        //handle error
+        return false;
+    }
+
+    std::string credentials(buffer);
+    std::string username = credentials.substr(0, credentials.find(' '));
+    std::string password = credentials.substr(credentials.find(' ') + 1);
+
+    return authenticateUser(username, password);
+}
+
+
 int initialize_server_socket(struct sockaddr_in server_addr, socklen_t server_bind){
     int backlog = 5;
 
@@ -26,6 +43,12 @@ int initialize_server_socket(struct sockaddr_in server_addr, socklen_t server_bi
         perror("error creating socket");
         exit(EXIT_FAILURE);
     }
+    int opt = 1;
+    if (setsockopt(sockFD, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+    }
+
     if(bind(sockFD, (struct sockaddr *)&server_addr,sizeof(server_addr)) == -1) {
 
         perror("binding error");
@@ -39,19 +62,8 @@ int initialize_server_socket(struct sockaddr_in server_addr, socklen_t server_bi
     return sockFD;
 }
 
-void receiveMessages(int clientSocket) {
-    while (true) {
-        char buffer[1024];
-        int bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
-        if (bytesRead <= 0){
-            // Handle disconnection or error
-            cout << "Disconnected from server or error occured";
-            break;
-        }
-        buffer[bytesRead] = '\0'; // Null-terminate the string
-        cout << "received: " << buffer << endl;
-    }
-}
+
+
 
 // Add a new client to the socket list
 void addClient(int clientSocket){
@@ -77,7 +89,11 @@ void broadcastMessage(const char* message){
 
     lock_guard<mutex> lock(clientListMutex);
     for (int socket : clientSockets){
-        send(socket, message, strlen(message), 0);
+        if (send(socket, message, strlen(message), 0) == -1) {
+            perror("Failed to send message to a client");
+            // Consider removing this client from the list.
+            // However, be careful when altering the list you're iterating over.
+        }
     }
 }
 
@@ -104,7 +120,6 @@ int main() {
     struct sockaddr_in server_addr;
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
-    int backlog = 5;
 
 
     // Zero out the structure
@@ -119,22 +134,11 @@ int main() {
 
 
     while(true) {
-        string message;
-        getline(cin, message);
-
         int clientSocket = accept(listeningSocket, (struct sockaddr*)&client_addr, &client_addr_len);
-
         if (clientSocket == -1){
             perror("error accepting client");
             continue;
         }
-        if (send(clientSocket, message.c_str(), message.length(), 0) == -1) {
-            perror("Failed to send message");
-            break;
-        }
-        struct sockaddr_in client_addr;
-        socklen_t client_addr_len = sizeof(client_addr);
-
         thread(clientHandler, clientSocket).detach();
     }
     close(listeningSocket);
