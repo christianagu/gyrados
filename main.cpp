@@ -9,11 +9,39 @@
 
 using namespace std;
 
+
+int server_Listener(struct sockaddr_in server_sockFD, socklen_t server_bind){
+    int backlog = 0;
+
+    int sockFD = socket(AF_INET, SOCK_STREAM, 0);
+
+    if(sockFD == -1){
+        perror("error creating socket");
+        exit(EXIT_FAILURE);
+    }
+    int result = bind(sockFD, (struct sockaddr *)&server_sockFD, sizeof(server_sockFD));
+    int result_Listen = listen(result, backlog);
+
+    return result_Listen;
+}
+
+
+
+
+
+
 int main() {
     struct sockaddr_in server_addr;
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
     int backlog = 5;
+    server_Listener(server_addr, client_addr_len);
+
+
+}
+    
+    /*
+    server_Listener(server_addr, socklen_t client_addr_len);
 
     server_addr.sin_family = AF_INET; // IPv4
     server_addr.sin_port = htons(8080); // selecting port
@@ -41,5 +69,6 @@ int main() {
 
     list<int> clients; // storing client IDs
     mutex clientMutex;
+    */
 }
     
