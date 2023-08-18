@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <list>
 #include <mutex>
+#include <thread>
 
 using namespace std;
 
@@ -16,8 +17,8 @@ list<int> clientSockets; // storing client IDs
 // Synchronization of primitives
 mutex clientListMutex;
 
-int server_Listener(struct sockaddr_in server_sockFD, socklen_t server_bind){
-    int backlog = 0;
+int initialize_server_socket(struct sockaddr_in server_addr, socklen_t server_bind){
+    int backlog = 5;
 
     int sockFD = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -25,10 +26,17 @@ int server_Listener(struct sockaddr_in server_sockFD, socklen_t server_bind){
         perror("error creating socket");
         exit(EXIT_FAILURE);
     }
-    int result = bind(sockFD, (struct sockaddr *)&server_sockFD, sizeof(server_sockFD));
-    int result_Listen = listen(result, backlog);
+    if(bind(sockFD, (struct sockaddr *)&server_addr,sizeof(server_addr)) == -1) {
 
-    return result_Listen;
+        perror("binding error");
+        exit(EXIT_FAILURE);
+    }
+    if(listen(sockFD, backlog) == -1){
+
+        perror("listen error");
+        exit(EXIT_FAILURE);
+    }
+    return sockFD;
 }
 
 // Add a new client to the socket list
@@ -84,8 +92,24 @@ int main() {
     socklen_t client_addr_len = sizeof(client_addr);
     int backlog = 5;
 
-    server_Listener(server_addr, client_addr_len);
-    
+    int listeningSocket = initialize_server_socket(server_addr, client_addr_len);
+
+
+    while(true) {
+
+        struct sockaddr_in client_addr;
+        socklen_t client_addr_len = sizeof(client_addr);
+
+        int clientSocket = accept(listeningSocket, (struct sockaddr*)&client_addr, &client_addr_len);
+
+        if (clientSocket == -1){
+            perror("error accepting client");
+            continue;
+        }
+        thread(clientHandler, clientSocket).detach();
+    }
+    close(listeningSocket);
+    return 0;
 }
     
     /*
