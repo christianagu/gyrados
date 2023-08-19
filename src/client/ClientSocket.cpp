@@ -67,6 +67,14 @@ int main() {
     thread receiveThread(receiveMessages, clientSocket);
     receiveThread.detach();
 
+    string username, password;
+    cout << "Enter username: ";
+    cin >> username;
+    cout << "Enter password: ";
+    cin >> password;
+    string credentials = username + "  " + password;
+    send(clientSocket, credentials.c_str(), credentials.length(),0);
+    
     while (true) {
 
         sendMessages(clientSocket);

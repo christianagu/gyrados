@@ -99,6 +99,11 @@ void broadcastMessage(const char* message){
 
 void clientHandler(int clientSocket){
     addClient(clientSocket);
+    if (!handleLogin(clientSocket)) {
+        cout << "Failed authentication";
+        close(clientSocket);
+        return; // end the thread
+    }
 
     while(true) {
 
@@ -132,7 +137,7 @@ int main() {
 
     int listeningSocket = initialize_server_socket(server_addr, client_addr_len);
 
-
+    connectToDatabase();
     while(true) {
         int clientSocket = accept(listeningSocket, (struct sockaddr*)&client_addr, &client_addr_len);
         if (clientSocket == -1){
